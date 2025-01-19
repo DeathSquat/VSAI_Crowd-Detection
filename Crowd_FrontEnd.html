@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crowd Detection</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        video {
+            width: 100%;
+            max-width: 600px;
+            border: 2px solid #333;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        button {
+            padding: 10px 15px;
+            margin: 5px;
+            font-size: 16px;
+            color: white;
+            background-color: #007bff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        #results {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #007bff;
+            border-radius: 5px;
+            background-color: white;
+            width: 100%;
+            max-width: 600px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        #results p {
+            margin: 5px 0;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <h1>Crowd Detection System</h1>
+    <video id="video" autoplay></video>
+    <div>
+        <button id="startButton">Start Camera</button>
+        <button id="stopButton">Stop Camera</button>
+        <button id="screenshotButton">Take Screenshot</button>
+        <button id="detectButton">Detect Crowd</button>
+    </div>
+    <div id="results"></div>
+
+    <script>
+        const videoElement = document.getElementById('video');
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton');
+        const detectButton = document.getElementById('detectButton');
+        const resultsDiv = document.getElementById('results');
+        let stream;
+
+        async function setupWebcam() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                videoElement.srcObject = stream;
+            } catch (error) {
+                console.error("Error accessing the webcam: ", error);
+                alert("Could not access the webcam. Please check your camera settings.");
+            }
+        }
+
+        function stopWebcam() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                videoElement.srcObject = null;
+            }
+        }
+
+        async function captureScreenshot() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 416; // Set the canvas size to match your model's input size
+            canvas.height = 416;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+
+            canvas.toBlob(async (blob) => {
+                if (!blob) {
+                    console.error("Failed to capture the image from the video.");
+                    resultsDiv.innerHTML = `<p>Error capturing the image. Please try again.</p>`;
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('image', blob, 'crowd.jpg');
+
+                try {
+                    const response = await fetch('/detect-crowd', {
+                        method: 'POST',
+                        body: formData,
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || 'Network response was not ok');
+                    }
+
+                    const data = await response.json();
+                    displayResults(data);
+                } catch (error) {
+                    console.error("Error during fetch operation: ", error);
+                    resultsDiv.innerHTML = `<p>Error processing the image: ${error.message}</p>`;
+                }
+            }, 'image/jpeg');
+        }
+
+        function displayResults(data) {
+            if (data.error) {
+                resultsDiv.innerHTML = `<p>Error: ${data.error}</p>`;
+            } else {
+                resultsDiv.innerHTML = `
+                    <p>Persons Count: ${data.crowdCount}</p>
+                    <p>Alarm Triggered: ${data.alarmTriggered}</p>
+                    <p>Message: ${data.message}</p>
+                `;
+            }
+        }
+
+        startButton.addEventListener('click', setupWebcam);
+        stopButton.addEventListener('click', stopWebcam);
+        detectButton.addEventListener('click', captureScreenshot);
+    </script>
+</body>
+</html>
