@@ -1,4 +1,5 @@
 VisionSenseAI - Crowd Detection 👥
+
 An advanced AI-driven crowd detection system designed for real-time monitoring and management of crowded areas. Ideal for public places, events, and security-sensitive zones, it helps in crowd control and ensures public safety.
 
 Key Features
